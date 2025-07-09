@@ -79,71 +79,86 @@ class WebResearchTool(BaseTool):
                 
                 return self._execute_operation(operation, query, url, num_results, extract_type, css_selector, analysis_type)
             else:
-                # Handle the named parameter format
-                return self._execute_operation(
-                    operation=tool_input,
-                    query=None,
-                    url=None,
-                    num_results=5,
-                    extract_type="text",
-                    css_selector=None,
-                    analysis_type="summary"
-                )
+                # Handle other input types - convert to string and parse
+                logger.warning(f"Unexpected input type {type(tool_input)}: {tool_input}")
+                return self._handle_string_input(str(tool_input))
         except Exception as e:
             logger.error(f"Error in web research tool: {str(e)}")
             return {"error": str(e), "success": False}
     
     def _handle_string_input(self, input_str: str) -> Dict[str, Any]:
         """Handle string input from older LangChain versions."""
-        input_str = input_str.strip()
-        
-        # Try to detect the operation from the input string
-        if input_str.startswith("search") or "search for" in input_str.lower():
-            # Extract query from search request
-            if input_str.startswith("search "):
-                query = input_str[7:].strip()
-            elif "search for" in input_str.lower():
-                query = input_str.lower().split("search for", 1)[1].strip()
-            else:
-                query = input_str
-            return self._execute_operation("search", query, None, 5, "text", None, "summary")
+        try:
+            input_str = input_str.strip()
             
-        elif input_str.startswith("news") or "news about" in input_str.lower():
-            # Extract query from news request
-            if input_str.startswith("news "):
-                query = input_str[5:].strip()
-            elif "news about" in input_str.lower():
-                query = input_str.lower().split("news about", 1)[1].strip()
-            else:
-                query = input_str
-            return self._execute_operation("news", query, None, 5, "text", None, "summary")
+            # Try to parse as JSON first
+            try:
+                if input_str.startswith('{') and input_str.endswith('}'):
+                    json_data = json.loads(input_str)
+                    operation = json_data.get("operation", "")
+                    query = json_data.get("query")
+                    url = json_data.get("url")
+                    num_results = json_data.get("num_results", 5)
+                    extract_type = json_data.get("extract_type", "text")
+                    css_selector = json_data.get("css_selector")
+                    analysis_type = json_data.get("analysis_type", "summary")
+                    
+                    return self._execute_operation(operation, query, url, num_results, extract_type, css_selector, analysis_type)
+            except (json.JSONDecodeError, AttributeError):
+                # Not JSON, continue with string parsing
+                pass
             
-        elif input_str.startswith("academic") or "academic papers" in input_str.lower():
-            # Extract query from academic request
-            if input_str.startswith("academic "):
-                query = input_str[9:].strip()
+            # Try to detect the operation from the input string
+            if input_str.startswith("search") or "search for" in input_str.lower():
+                # Extract query from search request
+                if input_str.startswith("search "):
+                    query = input_str[7:].strip()
+                elif "search for" in input_str.lower():
+                    query = input_str.lower().split("search for", 1)[1].strip()
+                else:
+                    query = input_str
+                return self._execute_operation("search", query, None, 5, "text", None, "summary")
+                
+            elif input_str.startswith("news") or "news about" in input_str.lower():
+                # Extract query from news request
+                if input_str.startswith("news "):
+                    query = input_str[5:].strip()
+                elif "news about" in input_str.lower():
+                    query = input_str.lower().split("news about", 1)[1].strip()
+                else:
+                    query = input_str
+                return self._execute_operation("news", query, None, 5, "text", None, "summary")
+                
+            elif input_str.startswith("academic") or "academic papers" in input_str.lower():
+                # Extract query from academic request
+                if input_str.startswith("academic "):
+                    query = input_str[9:].strip()
+                else:
+                    query = input_str
+                return self._execute_operation("academic", query, None, 5, "text", None, "summary")
+                
+            elif input_str.startswith("scrape") or input_str.startswith("http"):
+                # Handle scrape operation
+                if input_str.startswith("scrape "):
+                    url = input_str[7:].strip()
+                else:
+                    url = input_str
+                return self._execute_operation("scrape", None, url, 5, "text", None, "summary")
+                
+            elif input_str.startswith("analyze"):
+                # Handle analyze operation
+                if input_str.startswith("analyze "):
+                    url = input_str[8:].strip()
+                else:
+                    url = input_str
+                return self._execute_operation("analyze", None, url, 5, "text", None, "summary")
             else:
-                query = input_str
-            return self._execute_operation("academic", query, None, 5, "text", None, "summary")
-            
-        elif input_str.startswith("scrape") or input_str.startswith("http"):
-            # Handle scrape operation
-            if input_str.startswith("scrape "):
-                url = input_str[7:].strip()
-            else:
-                url = input_str
-            return self._execute_operation("scrape", None, url, 5, "text", None, "summary")
-            
-        elif input_str.startswith("analyze"):
-            # Handle analyze operation
-            if input_str.startswith("analyze "):
-                url = input_str[8:].strip()
-            else:
-                url = input_str
-            return self._execute_operation("analyze", None, url, 5, "text", None, "summary")
-        else:
-            # Default to search if we can't determine the operation
-            return self._execute_operation("search", input_str, None, 5, "text", None, "summary")
+                # Default to search if we can't determine the operation
+                return self._execute_operation("search", input_str, None, 5, "text", None, "summary")
+                
+        except Exception as e:
+            logger.error(f"Error handling string input '{input_str}': {str(e)}")
+            return {"error": f"Failed to parse input: {str(e)}", "success": False}
     
     def _execute_operation(self, 
                           operation: str, 

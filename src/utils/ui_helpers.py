@@ -5,7 +5,6 @@ UI helper functions for the Streamlit interface.
 import streamlit as st
 from typing import Dict, Any, List, Optional, Union
 import plotly.graph_objects as go
-import plotly.express as px
 import pandas as pd
 from datetime import datetime
 import json
@@ -39,7 +38,7 @@ def render_tool_usage(tool_name: str, tool_input: Dict[str, Any], tool_output: A
                 st.json(tool_output)
             elif isinstance(tool_output, pd.DataFrame):
                 st.dataframe(tool_output)
-            elif isinstance(tool_output, (go.Figure, px.Figure)):
+            elif isinstance(tool_output, go.Figure):
                 st.plotly_chart(tool_output)
             else:
                 st.text(str(tool_output))
@@ -174,11 +173,17 @@ def render_metrics_dashboard(metrics: Dict[str, Any]) -> None:
     
     # Response time chart
     if "response_times" in metrics and metrics["response_times"]:
-        fig = px.line(
-            x=range(len(metrics["response_times"])),
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=list(range(len(metrics["response_times"]))),
             y=metrics["response_times"],
+            mode='lines+markers',
+            name='Response Time'
+        ))
+        fig.update_layout(
             title="Response Time Over Time",
-            labels={"x": "Query Number", "y": "Response Time (seconds)"}
+            xaxis_title="Query Number",
+            yaxis_title="Response Time (seconds)"
         )
         st.plotly_chart(fig, use_container_width=True)
 
